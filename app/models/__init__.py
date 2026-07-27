@@ -1,3 +1,4 @@
+from app.models.ai_usage_log import AiUsageLog
 from app.models.character import Character
 from app.models.chapter import Chapter
 from app.models.generation_task import GenerationTask
@@ -14,6 +15,7 @@ from app.models.volume import Volume
 from app.models.worldview import Worldview
 
 __all__ = [
+    "AiUsageLog",
     "Character",
     "Chapter",
     "GenerationTask",

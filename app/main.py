@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import chapters, export, generate, projects, quality, settings as settings_api
+from app.api import chapters, export, generate, novel_intro, projects, quality, settings as settings_api
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -44,6 +44,7 @@ app.include_router(generate.router)
 app.include_router(chapters.router)
 app.include_router(quality.router)
 app.include_router(export.router)
+app.include_router(novel_intro.router)
 app.include_router(settings_api.router)
 
 
@@ -67,6 +68,28 @@ async def create_page(request: Request):
         "platforms": rules_engine.list_available("platforms"),
         "genres": rules_engine.list_available("genres"),
         "styles": rules_engine.list_available("styles"),
+    })
+
+
+@app.get("/project/{project_id}/intro")
+async def novel_intro_page(
+    project_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    import uuid as _uuid
+    from app.models.novel_intro import NovelIntro as NI
+    pid = _uuid.UUID(project_id)
+    project = await session.get(Project, pid)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    stmt = select(NI).where(NI.project_id == pid)
+    result = await session.execute(stmt)
+    intro = result.scalar_one_or_none()
+    return templates.TemplateResponse("novel_intro.html", {
+        "request": request,
+        "project": project,
+        "intro": intro,
     })
 
 

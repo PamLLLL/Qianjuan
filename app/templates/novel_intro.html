@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}小说介绍 — {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/project/{{ project.id }}" class="text-gray-400 hover:text-gray-600">← 返回工作台</a>
+        <h1 class="text-2xl font-bold text-gray-800">小说介绍 · 发布素材</h1>
+    </div>
+
+    {% if not intro %}
+    <div class="bg-white rounded-lg shadow-sm border p-6 text-center">
+        <p class="text-gray-400 mb-4">尚未生成小说介绍</p>
+        <button onclick="generateIntro()"
+                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+            AI 生成发布素材
+        </button>
+        <div class="mt-4">
+            <span id="gen-status" class="text-sm text-gray-400"></span>
+        </div>
+        <pre id="gen-output" class="whitespace-pre-wrap text-sm text-left text-gray-600 mt-4 bg-gray-50 rounded-lg p-4 hidden"></pre>
+    </div>
+    {% else %}
+    <div class="space-y-4">
+        <!-- 书名 -->
+        <div class="bg-white rounded-lg shadow-sm border p-5">
+            <label class="block text-sm font-medium text-gray-500 mb-1">书名</label>
+            <input type="text" id="selected_title" value="{{ intro.selected_title or '' }}"
+                   placeholder="从候选中选择或自定义"
+                   class="w-full text-xl font-bold border-b border-gray-200 pb-2 focus:outline-none focus:border-blue-500">
+            {% if intro.title_candidates %}
+            <div class="flex flex-wrap gap-2 mt-2">
+                {% for tc in intro.title_candidates %}
+                <button onclick="document.getElementById('selected_title').value='{{ tc.title if tc is mapping else tc }}'"
+                        class="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-blue-100">
+                    {{ tc.title if tc is mapping else tc }}
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 金句 -->
+        <div class="bg-white rounded-lg shadow-sm border p-5">
+            <label class="block text-sm font-medium text-gray-500 mb-1">一句话金句</label>
+            <textarea id="hook_line" rows="2"
+                      class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{{ intro.hook_line or '' }}</textarea>
+        </div>
+
+        <!-- 主角 -->
+        <div class="bg-white rounded-lg shadow-sm border p-5">
+            <label class="block text-sm font-medium text-gray-500 mb-2">主角列表</label>
+            {% if intro.lead_characters %}
+            <div class="space-y-2">
+                {% for lc in intro.lead_characters %}
+                <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
+                    <span class="font-medium">{{ lc.name if lc is mapping else lc }}</span>
+                    <span class="text-gray-400">·</span>
+                    <span class="text-sm text-blue-600">{{ lc.tag if lc is mapping else '' }}</span>
+                    <span class="text-xs text-gray-400">({{ lc.role if lc is mapping else '' }})</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- CP 对比句 -->
+        {% if intro.cp_line %}
+        <div class="bg-white rounded-lg shadow-sm border p-5">
+            <label class="block text-sm font-medium text-gray-500 mb-1">CP 对比句</label>
+            <input type="text" id="cp_line" value="{{ intro.cp_line }}"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+        {% endif %}
+
+        <!-- 标签 -->
+        <div class="bg-white rounded-lg shadow-sm border p-5">
+            <label class="block text-sm font-medium text-gray-500 mb-2">标签</label>
+            <div class="flex flex-wrap gap-2">
+                {% if intro.tags %}
+                {% for tag in intro.tags %}
+                <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">{{ tag }}</span>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 简介 -->
+        <div class="bg-white rounded-lg shadow-sm border p-5">
+            <label class="block text-sm font-medium text-gray-500 mb-1">内容简介</label>
+            <textarea id="synopsis" rows="4"
+                      class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{{ intro.synopsis or '' }}</textarea>
+        </div>
+
+        <button onclick="saveIntro()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium">
+            保存修改
+        </button>
+        <span id="save-status" class="text-sm text-gray-400"></span>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/sse.js"></script>
+<script>
+const PROJECT_ID = '{{ project.id }}';
+
+function generateIntro() {
+    const outputEl = document.getElementById('gen-output');
+    const statusEl = document.getElementById('gen-status');
+    outputEl.classList.remove('hidden');
+    startGeneration('/api/novel-intro/generate/' + PROJECT_ID, {}, outputEl, statusEl, function() {
+        setTimeout(() => location.reload(), 1500);
+    });
+}
+
+async function saveIntro() {
+    const data = {
+        selected_title: document.getElementById('selected_title')?.value || null,
+        hook_line: document.getElementById('hook_line')?.value || null,
+        synopsis: document.getElementById('synopsis')?.value || null,
+    };
+    const cpEl = document.getElementById('cp_line');
+    if (cpEl) data.cp_line = cpEl.value;
+
+    const res = await fetch('/api/novel-intro/' + PROJECT_ID, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    document.getElementById('save-status').textContent = res.ok ? '保存成功' : '保存失败';
+}
+</script>
+{% endblock %}
