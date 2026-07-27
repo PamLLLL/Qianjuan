@@ -3,14 +3,18 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import projects
+from app.api import generate, projects
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from app.config import get_settings
 from app.database import get_session, init_db
+from app.models.project import Project
 from app.services import project_service
 from app.services.rules_engine import RulesEngine
 
@@ -34,6 +38,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 app.include_router(projects.router)
+app.include_router(generate.router)
 
 
 rules_engine = RulesEngine()
@@ -56,4 +61,48 @@ async def create_page(request: Request):
         "platforms": rules_engine.list_available("platforms"),
         "genres": rules_engine.list_available("genres"),
         "styles": rules_engine.list_available("styles"),
+    })
+
+
+@app.get("/project/{project_id}")
+async def project_workbench(
+    project_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    import uuid as _uuid
+    pid = _uuid.UUID(project_id)
+    stmt = (
+        select(Project)
+        .where(Project.id == pid)
+        .options(
+            selectinload(Project.setting),
+            selectinload(Project.characters),
+            selectinload(Project.worldview),
+            selectinload(Project.outline),
+            selectinload(Project.volumes),
+        )
+    )
+    result = await session.execute(stmt)
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    steps = [
+        {"key": "settings", "label": "基础设定", "done": project.setting is not None},
+        {"key": "characters", "label": "人物体系", "done": len(project.characters) > 0},
+        {"key": "worldview", "label": "世界观", "done": project.worldview is not None},
+        {"key": "outline", "label": "故事大纲", "done": project.outline is not None},
+        {"key": "volumes", "label": "分卷结构", "done": len(project.volumes) > 0},
+        {"key": "chapters", "label": "章节大纲", "done": False},
+        {"key": "content", "label": "正文撰写", "done": False},
+        {"key": "quality", "label": "质量检测", "done": False},
+        {"key": "intro", "label": "小说介绍", "done": False},
+        {"key": "export", "label": "导出下载", "done": False},
+    ]
+
+    return templates.TemplateResponse("project.html", {
+        "request": request,
+        "project": project,
+        "steps": steps,
     })

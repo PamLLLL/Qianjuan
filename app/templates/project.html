@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} — 千卷{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-3">
+        <a href="/" class="text-gray-400 hover:text-gray-600">← 返回</a>
+        <h1 class="text-xl font-bold text-gray-800">{{ project.name }}</h1>
+        <span class="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">{{ project.target_platform }}</span>
+    </div>
+</div>
+
+<div class="flex gap-6">
+    <!-- 左侧：步骤导航 -->
+    <div class="w-48 flex-shrink-0">
+        <nav class="bg-white rounded-lg shadow-sm border p-3 space-y-1">
+            {% for step in steps %}
+            <button onclick="switchStep('{{ step.key }}')"
+                    id="nav-{{ step.key }}"
+                    class="step-nav w-full text-left px-3 py-2 rounded-md text-sm transition
+                           {% if loop.first %}bg-blue-50 text-blue-700 font-medium{% else %}text-gray-600 hover:bg-gray-50{% endif %}">
+                <span class="inline-block w-4">{% if step.done %}✓{% else %}○{% endif %}</span>
+                {{ step.label }}
+            </button>
+            {% endfor %}
+        </nav>
+
+        <div class="mt-4 bg-white rounded-lg shadow-sm border p-3 text-xs text-gray-500 space-y-1">
+            <div>类型：{{ project.genre }}</div>
+            <div>字数：{{ project.actual_words }} / {{ project.target_words }}</div>
+            <div>状态：{{ project.status }}</div>
+        </div>
+    </div>
+
+    <!-- 右侧：主内容区 -->
+    <div class="flex-1 min-w-0">
+        <!-- 基础设定 -->
+        <div id="panel-settings" class="step-panel">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">基础设定</h2>
+                    <div class="flex gap-2">
+                        <span id="status-settings" class="text-sm text-gray-400"></span>
+                        <button onclick="doGenerate('settings')" id="btn-settings"
+                                class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700">
+                            {{ '重新生成' if project.setting else '生成' }}
+                        </button>
+                        <button onclick="cancelGeneration()" class="hidden text-sm text-red-500 hover:text-red-700" id="cancel-settings">
+                            取消
+                        </button>
+                    </div>
+                </div>
+                <pre id="output-settings" class="whitespace-pre-wrap text-sm text-gray-700 min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-50 rounded-lg p-4">{% if project.setting %}{{ project.setting.background }}
+
+基调：{{ project.setting.tone }}
+核心冲突：{{ project.setting.core_conflict }}
+目标读者：{{ project.setting.target_audience }}
+差异化：{{ project.setting.unique_selling_point }}{% else %}点击「生成」按钮，AI 将为你生成基础设定。{% endif %}</pre>
+            </div>
+        </div>
+
+        <!-- 人物体系 -->
+        <div id="panel-characters" class="step-panel hidden">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">人物体系</h2>
+                    <div class="flex gap-2">
+                        <span id="status-characters" class="text-sm text-gray-400"></span>
+                        <button onclick="doGenerate('characters')" id="btn-characters"
+                                class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700">
+                            {{ '重新生成' if project.characters else '生成' }}
+                        </button>
+                    </div>
+                </div>
+                <pre id="output-characters" class="whitespace-pre-wrap text-sm text-gray-700 min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-50 rounded-lg p-4">{% if project.characters %}{% for c in project.characters %}【{{ c.role }}】{{ c.name }}
+性格：{{ c.personality }}
+背景：{{ c.background }}
+动机：{{ c.motivation }}
+{% endfor %}{% else %}请先完成基础设定，然后生成人物体系。{% endif %}</pre>
+            </div>
+        </div>
+
+        <!-- 世界观 -->
+        <div id="panel-worldview" class="step-panel hidden">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">世界观</h2>
+                    <div class="flex gap-2">
+                        <span id="status-worldview" class="text-sm text-gray-400"></span>
+                        <button onclick="doGenerate('worldview')" id="btn-worldview"
+                                class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700">
+                            {{ '重新生成' if project.worldview else '生成' }}
+                        </button>
+                    </div>
+                </div>
+                <pre id="output-worldview" class="whitespace-pre-wrap text-sm text-gray-700 min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-50 rounded-lg p-4">{% if project.worldview %}类型：{{ project.worldview.world_type }}
+地理：{{ project.worldview.geography }}
+社会：{{ project.worldview.society }}
+力量体系：{{ project.worldview.power_system }}
+历史：{{ project.worldview.history }}
+文化：{{ project.worldview.culture }}{% else %}请先完成基础设定和人物体系。{% endif %}</pre>
+            </div>
+        </div>
+
+        <!-- 故事大纲 -->
+        <div id="panel-outline" class="step-panel hidden">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">故事大纲</h2>
+                    <div class="flex gap-2">
+                        <span id="status-outline" class="text-sm text-gray-400"></span>
+                        <button onclick="doGenerate('outline')" id="btn-outline"
+                                class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700">
+                            {{ '重新生成' if project.outline else '生成' }}
+                        </button>
+                    </div>
+                </div>
+                <pre id="output-outline" class="whitespace-pre-wrap text-sm text-gray-700 min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-50 rounded-lg p-4">{% if project.outline %}前提：{{ project.outline.premise }}{% else %}请先完成前面的步骤。{% endif %}</pre>
+            </div>
+        </div>
+
+        <!-- 占位面板 -->
+        {% for key in ['volumes', 'chapters', 'content', 'quality', 'intro', 'export'] %}
+        <div id="panel-{{ key }}" class="step-panel hidden">
+            <div class="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-400 py-20">
+                此功能将在后续版本中实现
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/sse.js"></script>
+<script>
+const PROJECT_ID = '{{ project.id }}';
+
+function switchStep(key) {
+    document.querySelectorAll('.step-panel').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.step-nav').forEach(el => {
+        el.classList.remove('bg-blue-50', 'text-blue-700', 'font-medium');
+        el.classList.add('text-gray-600');
+    });
+
+    const panel = document.getElementById('panel-' + key);
+    const nav = document.getElementById('nav-' + key);
+    if (panel) panel.classList.remove('hidden');
+    if (nav) {
+        nav.classList.add('bg-blue-50', 'text-blue-700', 'font-medium');
+        nav.classList.remove('text-gray-600');
+    }
+}
+
+function doGenerate(step) {
+    const outputEl = document.getElementById('output-' + step);
+    const statusEl = document.getElementById('status-' + step);
+    const url = '/api/generate/' + step + '/' + PROJECT_ID;
+
+    startGeneration(url, {}, outputEl, statusEl, function(content) {
+        // Reload page to show saved data
+        setTimeout(() => window.location.reload(), 1000);
+    });
+}
+</script>
+{% endblock %}
