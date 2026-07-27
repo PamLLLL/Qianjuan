@@ -14,9 +14,10 @@ from pydantic import BaseModel, Field
 
 from app.database import get_session
 from app.models.chapter import Chapter
+from app.models.generation_task import GenerationTask
 from app.models.project import Project
 from app.models.volume import Volume
-from app.services import generation_service
+from app.services import generation_service, task_service
 
 
 class ChapterContentRequest(BaseModel):
@@ -155,3 +156,51 @@ async def generate_chapter_content(
         session, project, chapter, word_target
     )
     return EventSourceResponse(_stream_wrapper(gen))
+
+
+@router.post("/auto/{project_id}")
+async def auto_generate(
+    project_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    """Start full-auto generation (F20). SSE stream with step progress."""
+    project = await _get_project_with_relations(session, project_id)
+    task = await task_service.start_auto_generation(session, project_id)
+
+    async def stream() -> AsyncGenerator[dict, None]:
+        try:
+            async for event in task_service.run_auto_steps(session, task):
+                yield {"data": event}
+            yield {"data": "[DONE]"}
+        except Exception as e:
+            yield {"data": json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False)}
+
+    return EventSourceResponse(stream())
+
+
+@router.post("/cancel/{task_id}")
+async def cancel_generation(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    success = await task_service.cancel_task(session, task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return {"message": "任务已取消"}
+
+
+@router.get("/task/{project_id}")
+async def get_task_status(
+    project_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    task = await task_service.get_task(session, project_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="没有生成任务")
+    return {
+        "id": str(task.id),
+        "current_step": task.current_step,
+        "step_status": task.step_status,
+        "progress": task.progress,
+        "error_message": task.error_message,
+    }

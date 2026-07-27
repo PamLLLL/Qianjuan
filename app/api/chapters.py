@@ -89,6 +89,104 @@ async def update_word_target(
     return ChapterResponse.model_validate(chapter)
 
 
+@router.post("/{chapter_id}/expand")
+async def expand_chapter(
+    chapter_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    """AI expand: add ~500 words to the chapter (F18)."""
+    chapter = await session.get(Chapter, chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    if not chapter.content:
+        raise HTTPException(status_code=400, detail="章节无内容可扩写")
+
+    project = await _get_project(session, chapter.project_id)
+    await _save_version(session, chapter, "before_expand")
+
+    system_prompt = rules.build_system_prompt(
+        platform=project.target_platform,
+        style=project.style_preset,
+        genre=project.genre,
+    )
+    user_prompt = f"""请对以下小说章节进行扩写，增加约500字的内容。
+
+## 扩写要求
+- 在现有段落之间自然插入新内容
+- 增加感官描写、动作细节、环境描写
+- 丰富对话，增加角色互动
+- 保持原有情节和节奏不变
+- 不要在开头或结尾简单添加，要融入正文各处
+
+## 原文
+{chapter.content}
+
+请直接输出扩写后的完整正文。"""
+
+    provider = registry.get_provider(project.ai_provider)
+
+    async def stream():
+        full = ""
+        try:
+            async for chunk in provider.stream_generate(system_prompt, user_prompt):
+                full += chunk
+                yield {"data": json.dumps({"type": "chunk", "content": chunk}, ensure_ascii=False)}
+            chapter.content = full
+            chapter.word_count = len(full)
+            yield {"data": "[DONE]"}
+        except Exception as e:
+            yield {"data": json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False)}
+
+    return EventSourceResponse(stream())
+
+
+@router.post("/{chapter_id}/polish")
+async def polish_chapter(
+    chapter_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    """De-AI-flavor polish (F19): replace AI patterns with natural writing."""
+    chapter = await session.get(Chapter, chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    if not chapter.content:
+        raise HTTPException(status_code=400, detail="章节无内容可润色")
+
+    project = await _get_project(session, chapter.project_id)
+    await _save_version(session, chapter, "before_polish")
+
+    system_prompt = rules.build_system_prompt(
+        platform=project.target_platform,
+        style=project.style_preset,
+        genre=project.genre,
+    )
+    polish_rules = rules.load_generation_rules("polish")
+
+    user_prompt = f"""{polish_rules}
+
+## 待润色原文
+{chapter.content}
+
+请按照润色规则对以上内容进行去AI味润色，直接输出润色后的完整正文。"""
+
+    provider = registry.get_provider(project.ai_provider)
+
+    async def stream():
+        full = ""
+        try:
+            async for chunk in provider.stream_generate(system_prompt, user_prompt):
+                full += chunk
+                yield {"data": json.dumps({"type": "chunk", "content": chunk}, ensure_ascii=False)}
+            chapter.content = full
+            chapter.word_count = len(full)
+            chapter.status = "polished"
+            yield {"data": "[DONE]"}
+        except Exception as e:
+            yield {"data": json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False)}
+
+    return EventSourceResponse(stream())
+
+
 @router.post("/{chapter_id}/rewrite")
 async def rewrite_chapter(
     chapter_id: uuid.UUID,

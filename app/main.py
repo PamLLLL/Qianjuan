@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import chapters, generate, projects, quality, settings as settings_api
+from app.api import chapters, export, generate, projects, quality, settings as settings_api
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -43,6 +43,7 @@ app.include_router(projects.router)
 app.include_router(generate.router)
 app.include_router(chapters.router)
 app.include_router(quality.router)
+app.include_router(export.router)
 app.include_router(settings_api.router)
 
 
