@@ -105,7 +105,14 @@ def _model_options() -> dict[str, list[str]]:
 
 def _register_defaults() -> None:
     from app.core.ai.deepseek import DeepSeekProvider
+    from app.core.ai.claude import ClaudeProvider
+    from app.core.ai.openai_provider import OpenAIProvider
+    from app.core.ai.qwen import QwenProvider
+
     register_provider("deepseek", DeepSeekProvider)
+    register_provider("claude", ClaudeProvider)
+    register_provider("openai", OpenAIProvider)
+    register_provider("qwen", QwenProvider)
 
 
 _register_defaults()
