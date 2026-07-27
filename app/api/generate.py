@@ -10,9 +10,17 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from sse_starlette.sse import EventSourceResponse
 
+from pydantic import BaseModel, Field
+
 from app.database import get_session
+from app.models.chapter import Chapter
 from app.models.project import Project
+from app.models.volume import Volume
 from app.services import generation_service
+
+
+class ChapterContentRequest(BaseModel):
+    word_target: int | None = Field(default=None, gt=0)
 
 router = APIRouter(prefix="/api/generate", tags=["generate"])
 
@@ -97,4 +105,53 @@ async def generate_outline(
         raise HTTPException(status_code=409, detail="故事大纲已存在，请先删除后重新生成")
 
     gen = generation_service.generate_outline(session, project)
+    return EventSourceResponse(_stream_wrapper(gen))
+
+
+@router.post("/volumes/{project_id}")
+async def generate_volumes(
+    project_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    project = await _get_project_with_relations(session, project_id)
+    if not project.outline:
+        raise HTTPException(status_code=400, detail="请先生成故事大纲")
+    if project.volumes:
+        raise HTTPException(status_code=409, detail="分卷结构已存在，请先删除后重新生成")
+
+    gen = generation_service.generate_volumes(session, project)
+    return EventSourceResponse(_stream_wrapper(gen))
+
+
+@router.post("/chapter-outlines/{volume_id}")
+async def generate_chapter_outlines(
+    volume_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    volume = await session.get(Volume, volume_id)
+    if not volume:
+        raise HTTPException(status_code=404, detail="分卷不存在")
+
+    project = await _get_project_with_relations(session, volume.project_id)
+
+    gen = generation_service.generate_chapter_outlines(session, project, volume)
+    return EventSourceResponse(_stream_wrapper(gen))
+
+
+@router.post("/chapter-content/{chapter_id}")
+async def generate_chapter_content(
+    chapter_id: uuid.UUID,
+    body: ChapterContentRequest | None = None,
+    session: AsyncSession = Depends(get_session),
+):
+    chapter = await session.get(Chapter, chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+
+    project = await _get_project_with_relations(session, chapter.project_id)
+    word_target = body.word_target if body else None
+
+    gen = generation_service.generate_chapter_content(
+        session, project, chapter, word_target
+    )
     return EventSourceResponse(_stream_wrapper(gen))

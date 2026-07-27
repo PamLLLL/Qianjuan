@@ -120,11 +120,82 @@
             </div>
         </div>
 
-        <!-- 占位面板 -->
-        {% for key in ['volumes', 'chapters', 'content', 'quality', 'intro', 'export'] %}
+        <!-- 分卷结构 -->
+        <div id="panel-volumes" class="step-panel hidden">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">分卷结构</h2>
+                    <div class="flex gap-2">
+                        <span id="status-volumes" class="text-sm text-gray-400"></span>
+                        <button onclick="doGenerate('volumes')" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700">
+                            {{ '重新生成' if project.volumes else '生成' }}
+                        </button>
+                    </div>
+                </div>
+                <pre id="output-volumes" class="whitespace-pre-wrap text-sm text-gray-700 min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-50 rounded-lg p-4">{% if project.volumes %}{% for v in project.volumes %}【{{ v.title }}】目标 {{ v.word_target }} 字
+{{ v.summary or '' }}
+{% endfor %}{% else %}请先完成故事大纲。{% endif %}</pre>
+            </div>
+        </div>
+
+        <!-- 章节大纲 -->
+        <div id="panel-chapters" class="step-panel hidden">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">章节大纲</h2>
+                    <span id="status-chapter-outlines" class="text-sm text-gray-400"></span>
+                </div>
+                {% if project.volumes %}
+                <div class="space-y-3">
+                    {% for v in project.volumes %}
+                    <div class="border rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium">{{ v.title }}</span>
+                            <button onclick="generateChapterOutlines('{{ v.id }}')"
+                                    class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
+                                生成章节大纲
+                            </button>
+                        </div>
+                        <pre id="output-vol-{{ v.id }}" class="whitespace-pre-wrap text-xs text-gray-600 bg-gray-50 rounded p-3 max-h-[300px] overflow-y-auto">点击生成</pre>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-400">请先生成分卷结构</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 正文撰写 -->
+        <div id="panel-content" class="step-panel hidden">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">正文撰写</h2>
+                    <span id="status-content" class="text-sm text-gray-400"></span>
+                </div>
+                <div class="text-sm text-gray-500 mb-4">
+                    选择章节后点击「生成正文」，AI 将根据上下文逐章生成小说内容。
+                </div>
+                <div id="chapter-list" class="space-y-2">
+                    <p class="text-gray-400">请先生成章节大纲</p>
+                </div>
+                <div class="mt-4 border-t pt-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <label class="text-sm font-medium text-gray-700">目标字数：</label>
+                        <input type="number" id="content-word-target" value="3000" min="1000" max="10000" step="500"
+                               class="border rounded px-2 py-1 w-24 text-sm">
+                        <span class="text-xs text-gray-400">字</span>
+                    </div>
+                    <pre id="output-content" class="whitespace-pre-wrap text-sm text-gray-700 min-h-[300px] max-h-[600px] overflow-y-auto bg-gray-50 rounded-lg p-4">选择一个章节开始生成正文</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- 后续面板占位 -->
+        {% for key in ['quality', 'intro', 'export'] %}
         <div id="panel-{{ key }}" class="step-panel hidden">
             <div class="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-400 py-20">
-                此功能将在后续版本中实现
+                此功能将在 P1/P2 阶段实现
             </div>
         </div>
         {% endfor %}
@@ -153,14 +224,37 @@ function switchStep(key) {
     }
 }
 
+let selectedChapterId = null;
+
 function doGenerate(step) {
     const outputEl = document.getElementById('output-' + step);
     const statusEl = document.getElementById('status-' + step);
     const url = '/api/generate/' + step + '/' + PROJECT_ID;
 
     startGeneration(url, {}, outputEl, statusEl, function(content) {
-        // Reload page to show saved data
         setTimeout(() => window.location.reload(), 1000);
+    });
+}
+
+function generateChapterOutlines(volumeId) {
+    const outputEl = document.getElementById('output-vol-' + volumeId);
+    const statusEl = document.getElementById('status-chapter-outlines');
+    const url = '/api/generate/chapter-outlines/' + volumeId;
+
+    startGeneration(url, {}, outputEl, statusEl, function(content) {
+        setTimeout(() => window.location.reload(), 1000);
+    });
+}
+
+function generateChapterContent(chapterId) {
+    selectedChapterId = chapterId;
+    const outputEl = document.getElementById('output-content');
+    const statusEl = document.getElementById('status-content');
+    const wordTarget = parseInt(document.getElementById('content-word-target').value) || 3000;
+    const url = '/api/generate/chapter-content/' + chapterId;
+
+    startGeneration(url, {word_target: wordTarget}, outputEl, statusEl, function(content) {
+        statusEl.textContent = '生成完成，字数：' + content.length;
     });
 }
 </script>

@@ -8,13 +8,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import generate, projects
+from app.api import generate, projects, settings as settings_api
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.database import get_session, init_db
 from app.models.project import Project
+from app.core.ai import registry
+from app.models.global_config import GlobalConfig
 from app.services import project_service
 from app.services.rules_engine import RulesEngine
 
@@ -39,6 +41,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 app.include_router(projects.router)
 app.include_router(generate.router)
+app.include_router(settings_api.router)
 
 
 rules_engine = RulesEngine()
@@ -61,6 +64,35 @@ async def create_page(request: Request):
         "platforms": rules_engine.list_available("platforms"),
         "genres": rules_engine.list_available("genres"),
         "styles": rules_engine.list_available("styles"),
+    })
+
+
+@app.get("/settings")
+async def settings_page(request: Request, session: AsyncSession = Depends(get_session)):
+    config = await session.get(GlobalConfig, 1)
+    if not config:
+        config = GlobalConfig(id=1)
+        session.add(config)
+        await session.flush()
+
+    providers_raw = registry.list_providers()
+    key_name_map = {
+        "deepseek": "deepseek_api_key",
+        "claude": "claude_api_key",
+        "openai": "openai_api_key",
+        "qwen": "dashscope_api_key",
+    }
+    providers = []
+    for p in providers_raw:
+        providers.append({
+            **p,
+            "key_name": key_name_map.get(p["name"], ""),
+        })
+
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "config": config,
+        "providers": providers,
     })
 
 

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}设置 — 千卷{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex items-center mb-6">
+        <a href="/" class="text-gray-400 hover:text-gray-600 mr-3">← 返回</a>
+        <h1 class="text-2xl font-bold text-gray-800">全局设置</h1>
+    </div>
+
+    <!-- API Key 配置 -->
+    <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-4">API Key 配置</h2>
+        <p class="text-sm text-gray-500 mb-4">API Key 仅存储在本地 .env 文件中，不会上传到任何服务器。</p>
+
+        <form id="api-key-form" class="space-y-4">
+            {% for provider in providers %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ provider.display_name }}
+                    {% if provider.available %}
+                    <span class="text-green-500 text-xs ml-1">✓ 已配置</span>
+                    {% else %}
+                    <span class="text-gray-400 text-xs ml-1">未配置</span>
+                    {% endif %}
+                </label>
+                <input type="password" name="{{ provider.key_name }}"
+                       placeholder="{{ '已配置（留空不修改）' if provider.available else '输入 API Key' }}"
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm">
+            </div>
+            {% endfor %}
+
+            <button type="submit"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                保存 API Key
+            </button>
+            <span id="key-status" class="text-sm text-gray-400 ml-2"></span>
+        </form>
+    </div>
+
+    <!-- 默认模型选择 -->
+    <div class="bg-white rounded-lg shadow-sm border p-6">
+        <h2 class="text-lg font-semibold mb-4">默认模型</h2>
+        <form id="model-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">默认 AI 提供商</label>
+                <select name="default_provider" id="default-provider"
+                        class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm">
+                    {% for provider in providers %}
+                    <option value="{{ provider.name }}" {{ 'selected' if provider.name == config.default_provider }}>
+                        {{ provider.display_name }} {{ '(已配置)' if provider.available else '(未配置)' }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                保存设置
+            </button>
+            <span id="model-status" class="text-sm text-gray-400 ml-2"></span>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('api-key-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = {};
+    for (const input of form.querySelectorAll('input[type="password"]')) {
+        if (input.value.trim()) {
+            data[input.name] = input.value.trim();
+        }
+    }
+    if (Object.keys(data).length === 0) {
+        document.getElementById('key-status').textContent = '没有输入任何 Key';
+        return;
+    }
+
+    const res = await fetch('/api/settings/api-keys', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (res.ok) {
+        document.getElementById('key-status').textContent = '保存成功';
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        document.getElementById('key-status').textContent = '保存失败';
+    }
+});
+
+document.getElementById('model-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const provider = document.getElementById('default-provider').value;
+    const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({default_provider: provider}),
+    });
+    document.getElementById('model-status').textContent = res.ok ? '保存成功' : '保存失败';
+});
+</script>
+{% endblock %}
