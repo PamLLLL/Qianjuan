@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}千卷 QianJuan — 项目列表{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">我的小说项目</h1>
+    <a href="/create"
+       class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+        + 创建新项目
+    </a>
+</div>
+
+{% if projects %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for p in projects %}
+    <a href="/project/{{ p.id }}" class="block bg-white rounded-lg shadow-sm border hover:shadow-md transition p-5">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-800 truncate">{{ p.name }}</h2>
+            <span class="text-xs px-2 py-1 rounded-full
+                {% if p.status == 'draft' %}bg-gray-100 text-gray-600
+                {% elif p.status == 'generating' %}bg-yellow-100 text-yellow-700
+                {% else %}bg-green-100 text-green-700{% endif %}">
+                {% if p.status == 'draft' %}草稿
+                {% elif p.status == 'generating' %}生成中
+                {% else %}已完成{% endif %}
+            </span>
+        </div>
+        <p class="text-sm text-gray-500 mb-3 line-clamp-2">{{ p.concept }}</p>
+        <div class="flex items-center gap-3 text-xs text-gray-400">
+            <span>{{ p.genre }}</span>
+            <span>·</span>
+            <span>{{ p.target_platform }}</span>
+            <span>·</span>
+            <span>{{ p.actual_words }} / {{ p.target_words }} 字</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-20">
+    <p class="text-gray-400 text-lg mb-4">还没有创建任何项目</p>
+    <a href="/create"
+       class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+        创建第一个小说项目
+    </a>
+</div>
+{% endif %}
+
+<div class="mt-6 text-center text-sm text-gray-400">
+    共 {{ total }} 个项目
+</div>
+{% endblock %}

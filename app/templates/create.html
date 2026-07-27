@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}创建新项目 — 千卷{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex items-center mb-6">
+        <a href="/" class="text-gray-400 hover:text-gray-600 mr-3">← 返回</a>
+        <h1 class="text-2xl font-bold text-gray-800">创建新项目</h1>
+    </div>
+
+    <form id="create-form" class="bg-white rounded-lg shadow-sm border p-6 space-y-5">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">项目名称</label>
+            <input type="text" name="name" required maxlength="200"
+                   class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="如：我的第一本玄幻小说">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">目标平台</label>
+                <select name="target_platform" required
+                        class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    {% for p in platforms %}
+                    <option value="{{ p.name }}">{{ p.display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">小说类型</label>
+                <select name="genre" required
+                        class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    {% for g in genres %}
+                    <option value="{{ g.name }}">{{ g.display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">风格预设</label>
+            <select name="style_preset"
+                    class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                <option value="">不选择风格</option>
+                {% for s in styles %}
+                <option value="{{ s.name }}">{{ s.display_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">核心创意</label>
+            <textarea name="concept" required rows="4"
+                      class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      placeholder="描述你的小说核心创意，如：一个现代大学生穿越到修仙世界，凭借前世的科学知识..."></textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">目标字数</label>
+            <input type="number" name="target_words" required min="10000" step="10000" value="200000"
+                   class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+            <p class="text-xs text-gray-400 mt-1">建议：短篇 5-10万，中篇 30-60万，长篇 100万+</p>
+        </div>
+
+        <button type="submit"
+                class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium">
+            创建项目
+        </button>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        name: form.name.value,
+        genre: form.genre.value,
+        concept: form.concept.value,
+        target_words: parseInt(form.target_words.value),
+        target_platform: form.target_platform.value,
+        style_preset: form.style_preset.value || null,
+    };
+
+    const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+
+    if (res.ok) {
+        const project = await res.json();
+        window.location.href = '/project/' + project.id;
+    } else {
+        const err = await res.json();
+        alert('创建失败: ' + (err.detail || '未知错误'));
+    }
+});
+</script>
+{% endblock %}
