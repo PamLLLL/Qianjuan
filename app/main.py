@@ -54,8 +54,7 @@ rules_engine = RulesEngine()
 @app.get("/")
 async def index(request: Request, session: AsyncSession = Depends(get_session)):
     items, total = await project_service.list_projects(session, page=1, size=50)
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "projects": items,
         "total": total,
     })
@@ -63,8 +62,7 @@ async def index(request: Request, session: AsyncSession = Depends(get_session)):
 
 @app.get("/create")
 async def create_page(request: Request):
-    return templates.TemplateResponse("create.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "create.html", {
         "platforms": rules_engine.list_available("platforms"),
         "genres": rules_engine.list_available("genres"),
         "styles": rules_engine.list_available("styles"),
@@ -86,8 +84,7 @@ async def novel_intro_page(
     stmt = select(NI).where(NI.project_id == pid)
     result = await session.execute(stmt)
     intro = result.scalar_one_or_none()
-    return templates.TemplateResponse("novel_intro.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "novel_intro.html", {
         "project": project,
         "intro": intro,
     })
@@ -115,8 +112,7 @@ async def settings_page(request: Request, session: AsyncSession = Depends(get_se
             "key_name": key_name_map.get(p["name"], ""),
         })
 
-    return templates.TemplateResponse("settings.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "settings.html", {
         "config": config,
         "providers": providers,
     })
@@ -159,8 +155,7 @@ async def project_workbench(
         {"key": "export", "label": "导出下载", "done": False},
     ]
 
-    return templates.TemplateResponse("project.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "project.html", {
         "project": project,
         "steps": steps,
     })
