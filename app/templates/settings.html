@@ -16,26 +16,39 @@
 
         <form id="api-key-form" class="space-y-4">
             {% for provider in providers %}
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                    {{ provider.display_name }}
+            <div class="border rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-sm font-medium text-gray-700">
+                        {{ provider.display_name }}
+                        {% if provider.available %}
+                        <span class="text-green-500 text-xs ml-1">✓ 已配置</span>
+                        {% else %}
+                        <span class="text-gray-400 text-xs ml-1">未配置</span>
+                        {% endif %}
+                    </label>
                     {% if provider.available %}
-                    <span class="text-green-500 text-xs ml-1">✓ 已配置</span>
-                    {% else %}
-                    <span class="text-gray-400 text-xs ml-1">未配置</span>
+                    <button type="button" onclick="testConnection('{{ provider.name }}')"
+                            class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded hover:bg-gray-200 transition">
+                        测试连接
+                    </button>
                     {% endif %}
-                </label>
-                <input type="password" name="{{ provider.key_name }}"
-                       placeholder="{{ '已配置（留空不修改）' if provider.available else '输入 API Key' }}"
-                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+                <div class="flex gap-2">
+                    <input type="password" name="{{ provider.key_name }}"
+                           placeholder="{{ '已配置（留空不修改）' if provider.available else '输入 API Key' }}"
+                           class="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+                <div id="test-result-{{ provider.name }}" class="mt-2 text-xs hidden"></div>
             </div>
             {% endfor %}
 
-            <button type="submit"
-                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                保存 API Key
-            </button>
-            <span id="key-status" class="text-sm text-gray-400 ml-2"></span>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                    保存 API Key
+                </button>
+                <span id="key-status" class="text-sm text-gray-400"></span>
+            </div>
         </form>
     </div>
 
@@ -55,11 +68,13 @@
                 </select>
             </div>
 
-            <button type="submit"
-                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                保存设置
-            </button>
-            <span id="model-status" class="text-sm text-gray-400 ml-2"></span>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                    保存设置
+                </button>
+                <span id="model-status" class="text-sm text-gray-400"></span>
+            </div>
         </form>
     </div>
 </div>
@@ -81,16 +96,19 @@ document.getElementById('api-key-form').addEventListener('submit', async (e) => 
         return;
     }
 
+    const statusEl = document.getElementById('key-status');
+    statusEl.textContent = '保存中...';
+
     const res = await fetch('/api/settings/api-keys', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
     });
     if (res.ok) {
-        document.getElementById('key-status').textContent = '保存成功';
-        setTimeout(() => location.reload(), 1000);
+        statusEl.textContent = '保存成功，刷新页面...';
+        setTimeout(() => location.reload(), 800);
     } else {
-        document.getElementById('key-status').textContent = '保存失败';
+        statusEl.textContent = '保存失败';
     }
 });
 
@@ -104,5 +122,28 @@ document.getElementById('model-form').addEventListener('submit', async (e) => {
     });
     document.getElementById('model-status').textContent = res.ok ? '保存成功' : '保存失败';
 });
+
+async function testConnection(providerName) {
+    const resultEl = document.getElementById('test-result-' + providerName);
+    resultEl.classList.remove('hidden');
+    resultEl.className = 'mt-2 text-xs text-gray-500';
+    resultEl.textContent = '测试连接中...';
+
+    try {
+        const res = await fetch('/api/settings/test-connection/' + providerName, {method: 'POST'});
+        const data = await res.json();
+
+        if (data.success) {
+            resultEl.className = 'mt-2 text-xs text-green-600';
+            resultEl.textContent = '✓ 连接成功 — 模型: ' + data.model + ' — 响应: ' + data.response;
+        } else {
+            resultEl.className = 'mt-2 text-xs text-red-600';
+            resultEl.textContent = '✗ 连接失败: ' + data.error;
+        }
+    } catch (err) {
+        resultEl.className = 'mt-2 text-xs text-red-600';
+        resultEl.textContent = '✗ 请求异常: ' + err.message;
+    }
+}
 </script>
 {% endblock %}

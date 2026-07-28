@@ -43,6 +43,9 @@ _api_key_cache: dict[str, tuple[float, dict[str, str]]] = {}
 API_KEY_CACHE_TTL = 60.0
 
 
+PLACEHOLDER_VALUES = {"sk-xxx", "sk-ant-xxx", ""}
+
+
 def get_api_keys_from_env() -> dict[str, str]:
     """Read API keys from .env file with 60-second cache for hot reload."""
     cache_key = "api_keys"
@@ -62,8 +65,13 @@ def get_api_keys_from_env() -> dict[str, str]:
                 key, _, value = line.partition("=")
                 key = key.strip()
                 value = value.strip()
-                if key.endswith("_API_KEY"):
+                if key.endswith("_API_KEY") and value not in PLACEHOLDER_VALUES:
                     keys[key.lower()] = value
 
     _api_key_cache[cache_key] = (now, keys)
     return keys
+
+
+def clear_api_key_cache() -> None:
+    """Clear the API key cache. Call after writing to .env."""
+    _api_key_cache.clear()

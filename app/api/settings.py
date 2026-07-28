@@ -6,8 +6,9 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import BASE_DIR, get_api_keys_from_env
+from app.config import BASE_DIR, clear_api_key_cache, get_api_keys_from_env
 from app.core.ai import registry
+from app.core.ai.provider import AiError
 from app.database import get_session
 from app.models.global_config import GlobalConfig
 from app.schemas.settings import (
@@ -69,6 +70,7 @@ async def update_api_keys(data: ApiKeyUpdate):
         raise HTTPException(status_code=400, detail="没有提供任何 API Key")
 
     _write_env_keys(env_path, {k.upper(): v for k, v in updates.items() if v})
+    clear_api_key_cache()
     registry.clear_cache()
     return {"message": "API Key 已更新", "updated": list(updates.keys())}
 
@@ -77,6 +79,31 @@ async def update_api_keys(data: ApiKeyUpdate):
 async def get_providers():
     providers = registry.list_providers()
     return [ProviderInfo(**p) for p in providers]
+
+
+@router.post("/test-connection/{provider_name}")
+async def test_connection(provider_name: str):
+    """Test if an AI provider's API key is valid and the service is reachable."""
+    try:
+        provider = registry.get_provider(provider_name)
+    except (ValueError, AiError) as e:
+        return {"success": False, "provider": provider_name, "error": str(e)}
+
+    try:
+        response = await provider.generate(
+            system_prompt="你是一个测试助手。",
+            user_prompt="请回复'连接成功'四个字。",
+        )
+        return {
+            "success": True,
+            "provider": provider_name,
+            "model": provider.model,
+            "response": response[:100],
+        }
+    except AiError as e:
+        return {"success": False, "provider": provider_name, "error": str(e)}
+    except Exception as e:
+        return {"success": False, "provider": provider_name, "error": f"连接失败: {type(e).__name__}: {e}"}
 
 
 def _write_env_keys(env_path: Path, updates: dict[str, str]) -> None:
